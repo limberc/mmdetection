@@ -113,18 +113,8 @@ def main():
         shuffle=False)
 
     # build the model and load checkpoint
-    test_cfg = dict(
-        rpn=dict(
-            nms_across_levels=False,
-            nms_pre=1000,
-            nms_post=1000,
-            max_num=1000,
-            nms_thr=0.7,
-            min_bbox_size=0),
-        rcnn=dict(
-            score_thr=0.05, nms=dict(type='nms', iou_thr=0.5), max_per_img=100)
-    )
-    model = build_detector(cfg.model, train_cfg=None, test_cfg=test_cfg)
+    cfg.test_cfg.rcnn.nms.iou_thr = args.iou_thr
+    model = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg)
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:
         wrap_fp16_model(model)
