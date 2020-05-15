@@ -6,12 +6,12 @@ import torch
 from mmcv import Config, DictAction
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import get_dist_info, init_dist, load_checkpoint
-from tools.fuse_conv_bn import fuse_module
 
 from mmdet.apis import multi_gpu_test, single_gpu_test
 from mmdet.core import wrap_fp16_model
 from mmdet.datasets import build_dataloader, build_dataset
 from mmdet.models import build_detector
+from tools.fuse_conv_bn import fuse_module
 
 
 def parse_args():
@@ -24,19 +24,19 @@ def parse_args():
         '--fuse-conv-bn',
         action='store_true',
         help='Whether to fuse conv and bn, this will slightly increase'
-        'the inference speed')
+             'the inference speed')
     parser.add_argument(
         '--format-only',
         action='store_true',
         help='Format the output results without perform evaluation. It is'
-        'useful when you want to format the result to a specific format and '
-        'submit it to the test server')
+             'useful when you want to format the result to a specific format and '
+             'submit it to the test server')
     parser.add_argument(
         '--eval',
         type=str,
         nargs='+',
         help='evaluation metrics, which depends on the dataset, e.g., "bbox",'
-        ' "segm", "proposal" for COCO, and "mAP", "recall" for PASCAL VOC')
+             ' "segm", "proposal" for COCO, and "mAP", "recall" for PASCAL VOC')
     parser.add_argument('--show', action='store_true', help='show results')
     parser.add_argument(
         '--show-dir', help='directory where painted images will be saved')
@@ -46,13 +46,19 @@ def parse_args():
         default=0.3,
         help='score threshold (default: 0.3)')
     parser.add_argument(
+        '--iou_thr',
+        type=float,
+        default=0.5,
+        help='iou thr for NMS'
+    )
+    parser.add_argument(
         '--gpu-collect',
         action='store_true',
         help='whether to use gpu to collect results.')
     parser.add_argument(
         '--tmpdir',
         help='tmp directory used for collecting results from multiple '
-        'workers, available when gpu-collect is not specified')
+             'workers, available when gpu-collect is not specified')
     parser.add_argument(
         '--options', nargs='+', action=DictAction, help='arguments in dict')
     parser.add_argument(
@@ -71,7 +77,7 @@ def main():
     args = parse_args()
 
     assert args.out or args.eval or args.format_only or args.show \
-        or args.show_dir, \
+           or args.show_dir, \
         ('Please specify at least one operation (save/eval/format/show the '
          'results / save the results) with the argument "--out", "--eval"'
          ', "--format-only", "--show" or "--show-dir"')
@@ -107,7 +113,18 @@ def main():
         shuffle=False)
 
     # build the model and load checkpoint
-    model = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg)
+    test_cfg = dict(
+        rpn=dict(
+            nms_across_levels=False,
+            nms_pre=1000,
+            nms_post=1000,
+            max_num=1000,
+            nms_thr=0.7,
+            min_bbox_size=0),
+        rcnn=dict(
+            score_thr=0.05, nms=dict(type='nms', iou_thr=0.5), max_per_img=100)
+    )
+    model = build_detector(cfg.model, train_cfg=None, test_cfg=test_cfg)
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:
         wrap_fp16_model(model)
