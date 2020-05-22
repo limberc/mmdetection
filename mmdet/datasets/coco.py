@@ -17,7 +17,6 @@ from .custom import CustomDataset
 
 @DATASETS.register_module()
 class CocoDataset(CustomDataset):
-
     CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
                'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
                'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
@@ -300,7 +299,7 @@ class CocoDataset(CustomDataset):
         assert isinstance(results, list), 'results must be a list'
         assert len(results) == len(self), (
             'The length of results is not equal to the dataset len: {} != {}'.
-            format(len(results), len(self)))
+                format(len(results), len(self)))
 
         if jsonfile_prefix is None:
             tmp_dir = tempfile.TemporaryDirectory()
@@ -403,8 +402,10 @@ class CocoDataset(CustomDataset):
                     # Compute per-category AP
                     # from https://github.com/facebookresearch/detectron2/
                     precisions = cocoEval.eval['precision']
+                    recalls = cocoEval.eval['recall']
                     # precision: (iou, recall, cls, area range, max dets)
                     assert len(self.cat_ids) == precisions.shape[2]
+                    assert len(self.cat_ids) == recalls.shape[2]
 
                     results_per_category = []
                     for idx, catId in enumerate(self.cat_ids):
@@ -413,17 +414,24 @@ class CocoDataset(CustomDataset):
                         nm = self.coco.loadCats(catId)[0]
                         precision = precisions[:, :, idx, 0, -1]
                         precision = precision[precision > -1]
+                        recall = recalls[:, :, idx, 0, -1]
+                        recall = recalls[recall > -1]
+
                         if precision.size:
                             ap = np.mean(precision)
                         else:
                             ap = float('nan')
+                        if recall.size:
+                            ar = np.mean(recall)
+                        else:
+                            ar = float('nan')
                         results_per_category.append(
-                            (f'{nm["name"]}', f'{float(ap):0.3f}'))
+                            (f'{nm["name"]}', f'{float(ap):0.3f}', f'{float(ar):0.3f}'))
 
                     num_columns = min(6, len(results_per_category) * 2)
                     results_flatten = list(
                         itertools.chain(*results_per_category))
-                    headers = ['category', 'AP'] * (num_columns // 2)
+                    headers = ['category', 'AP', 'AR'] * (num_columns // 2)
                     results_2d = itertools.zip_longest(*[
                         results_flatten[i::num_columns]
                         for i in range(num_columns)
