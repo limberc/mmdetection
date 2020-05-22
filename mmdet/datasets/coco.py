@@ -405,7 +405,6 @@ class CocoDataset(CustomDataset):
                     recalls = cocoEval.eval['recall']
                     # precision: (iou, recall, cls, area range, max dets)
                     assert len(self.cat_ids) == precisions.shape[2]
-                    assert len(self.cat_ids) == recalls.shape[2]
 
                     results_per_category = []
                     for idx, catId in enumerate(self.cat_ids):
